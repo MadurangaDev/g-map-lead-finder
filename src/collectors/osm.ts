@@ -13,6 +13,10 @@ node
 
 out center;`;
 
+  // TODO:
+  // OSM queries should be driven by category-specific OSM tags.
+  // The 'keyword' parameter is reserved for future implementation.
+
   let data: OverpassResponse;
 
   try {
