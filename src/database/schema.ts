@@ -28,7 +28,9 @@ export const schema = {
 
             collected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-            notes TEXT
+            notes TEXT,
+
+            sources TEXT
 
         );
     `,
