@@ -1,9 +1,9 @@
 import { Lead } from "../models/Lead";
 import db from "./db";
 
-interface LeadRow extends Lead {
+interface LeadRow extends Omit<Lead, "sources"> {
   id: number;
-  sources: string[];
+  sources: string;
 }
 
 export function findLeadByPhone(phone: string): LeadRow | undefined {
@@ -87,8 +87,9 @@ export function updateLead(id: number, lead: Lead) {
         latitude = COALESCE(?, latitude),
         longitude = COALESCE(?, longitude),
         rating = COALESCE(?, rating),
-        reference_url = COALESCE(?, reference_url)
+        reference_url = COALESCE(?, reference_url),
         sources = COALESCE(?, sources),
+        notes = COALESCE(?, notes)
 
         WHERE id = ?
 
@@ -104,6 +105,7 @@ export function updateLead(id: number, lead: Lead) {
     lead.rating,
     lead.reference_url,
     JSON.stringify(lead.sources ?? []),
+    lead.notes,
     id,
   );
 }

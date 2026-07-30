@@ -1,35 +1,22 @@
 import { generateZones } from "../../services/zones";
 import { insertZone } from "../../database/zoneRepository";
 
+export function runZoneTest() {
+  const town = {
+    name: "Kandy",
 
-export function runZoneTest(){
+    latitude: 7.2906,
 
-    const town = {
+    longitude: 80.6337,
+  };
 
-        name: "Kandy",
+  const zones = generateZones(town);
 
-        latitude: 7.2906,
+  zones.forEach((zone) => {
+    insertZone(zone);
+  });
 
-        longitude: 80.6337
+  console.table(zones);
 
-    };
-
-
-    const zones =
-        generateZones(town);
-
-
-    zones.forEach(zone => {
-
-        insertZone(zone);
-
-    });
-
-
-    console.table(zones);
-
-    console.log(
-        "Zones saved"
-    );
-
+  console.log("Zones saved");
 }
