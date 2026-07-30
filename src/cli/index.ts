@@ -3,6 +3,8 @@
 import chalk from "chalk";
 import { loadJson } from "../config/loader";
 import { initializeDatabase } from "../database/db";
+import { normalizePhone } from "../services/phone";
+
 
 console.log(chalk.green("Vehicle Lead Finder"));
 
@@ -24,6 +26,7 @@ try {
   initializeDatabase();
 
   console.log(chalk.green("Database ready"));
+
 } catch (error) {
   console.error(chalk.red(String(error)));
 
