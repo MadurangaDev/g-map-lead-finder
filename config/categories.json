@@ -1,0 +1,28 @@
+[
+  {
+    "category": "Vehicle Repair",
+    "keywords": [
+      "garage",
+      "auto repair",
+      "vehicle service",
+      "mechanic"
+    ]
+  },
+  {
+    "category": "Transport & Logistics",
+    "keywords": [
+      "transport company",
+      "logistics",
+      "courier",
+      "delivery service"
+    ]
+  },
+  {
+    "category": "Vehicle Parts",
+    "keywords": [
+      "auto parts",
+      "spare parts",
+      "vehicle accessories"
+    ]
+  }
+]
