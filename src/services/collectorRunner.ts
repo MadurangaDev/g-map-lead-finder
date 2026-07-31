@@ -33,6 +33,7 @@ export async function runCollection() {
 
   const successfulZones: string[] = [];
   const failedZones: string[] = [];
+  const failedZoneObjects: Zone[] = [];
 
   for (const town of towns) {
     console.log(`\nTown: ${town.name}`);
@@ -70,9 +71,59 @@ export async function runCollection() {
         );
 
         failedZones.push(zone.name);
+        failedZoneObjects.push(zone);
       }
 
       await delay(DELAY_BETWEEN_ZONES_MS);
+    }
+  }
+
+  if (failedZones.length > 0) {
+    console.log("\n----------------------------------------");
+    console.log(`\nRetrying failed zones (${failedZones.length})...\n`);
+
+    const remainingFailedZones: string[] = [];
+
+    for (let i = 0; i < failedZoneObjects.length; i++) {
+      const zone = failedZoneObjects[i];
+
+      console.log(`\n   • ${zone.name}`);
+
+      try {
+        const leads = await collectOSM(zone, "car");
+
+        console.log(`Found ${leads.length} leads`);
+
+        for (const lead of leads) {
+          mergeLead(lead);
+        }
+
+        console.log(`Merged ${leads.length} lead(s) from ${zone.name}.`);
+
+        successfulZones.push(zone.name);
+      } catch (error: any) {
+        console.error(chalk.red(`FAILED`));
+
+        console.error(
+          `Could not collect OSM data for zone: ${zone.name}`,
+        );
+
+        console.error(`Reason: ${error.message}`);
+
+        console.error(
+          `No database changes were made for ${zone.name}.`,
+        );
+
+        remainingFailedZones.push(zone.name);
+      }
+
+      await delay(DELAY_BETWEEN_ZONES_MS);
+    }
+
+    failedZones.length = 0;
+
+    for (const name of remainingFailedZones) {
+      failedZones.push(name);
     }
   }
 

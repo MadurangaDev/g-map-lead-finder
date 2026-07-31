@@ -5,11 +5,11 @@ export const OVERPASS_TIMEOUT_MS = 60000;
 export const OVERPASS_RETRY_ROUNDS = 2;
 
 const OVERPASS_SERVERS = [
-  "https://invalid-overpass.private.coffee/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
 
-  "https://invalid-overpass.kumi.systems/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
 
-  "https://invalid-overpass-api.de/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
 ];
 
 export async function runOverpassQuery(query: string) {
