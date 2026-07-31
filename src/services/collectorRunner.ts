@@ -31,6 +31,9 @@ export async function runCollection() {
   console.log(`Categories: ${categories.length}`);
   console.log(`Towns: ${towns.length}`);
 
+  const successfulZones: string[] = [];
+  const failedZones: string[] = [];
+
   for (const town of towns) {
     console.log(`\nTown: ${town.name}`);
 
@@ -51,13 +54,47 @@ export async function runCollection() {
         }
 
         console.log(`Merged ${leads.length} lead(s) from ${zone.name}.`);
+
+        successfulZones.push(zone.name);
       } catch (error: any) {
-        console.error(`Skipped ${zone.name}: ${error.message}`);
+        console.error(chalk.red(`FAILED`));
+
+        console.error(
+          `Could not collect OSM data for zone: ${zone.name}`,
+        );
+
+        console.error(`Reason: ${error.message}`);
+
+        console.error(
+          `No database changes were made for ${zone.name}.`,
+        );
+
+        failedZones.push(zone.name);
       }
 
       await delay(DELAY_BETWEEN_ZONES_MS);
     }
   }
 
-  console.log(chalk.green("Collection finished."));
+  const totalZones = successfulZones.length + failedZones.length;
+
+  console.log("\n========================================");
+  console.log("\nCollection finished\n");
+  console.log(`Total zones      : ${totalZones}`);
+  console.log(`Successful zones : ${successfulZones.length}`);
+  console.log(`Failed zones     : ${failedZones.length}\n`);
+
+  if (failedZones.length > 0) {
+    console.log("Failed zones:\n");
+
+    for (const name of failedZones) {
+      console.log(`- ${name}`);
+    }
+
+    console.log("\nDatabase may be incomplete.");
+  } else {
+    console.log("All zones collected successfully.");
+  }
+
+  console.log("\n========================================");
 }

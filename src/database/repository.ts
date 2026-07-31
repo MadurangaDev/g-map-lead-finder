@@ -1,4 +1,5 @@
 import { Lead } from "../models/Lead";
+import { normalizeBusinessKey } from "../services/businessKey";
 import db from "./db";
 
 interface LeadRow extends Omit<Lead, "sources"> {
@@ -25,6 +26,41 @@ export function findLeadByPhone(phone: string): LeadRow | undefined {
     ...row,
     sources: row.sources ? JSON.parse(row.sources) : [],
   } as LeadRow;
+}
+
+export function findLeadByNameAndTown(
+  name: string,
+  town: string
+): LeadRow | undefined {
+  const key = normalizeBusinessKey(name, town);
+
+  if (!key) {
+    return undefined;
+  }
+
+  const candidates = db
+    .prepare(`
+      SELECT *
+      FROM leads
+      WHERE phone_normalized IS NULL
+    `)
+    .all() as LeadRow[];
+
+  const match = candidates.find(
+    row =>
+      normalizeBusinessKey(row.business_name, row.town) === key
+  );
+
+  if (!match) {
+    return undefined;
+  }
+
+  return {
+    ...match,
+    sources: match.sources
+      ? JSON.parse(match.sources)
+      : [],
+  };
 }
 
 export function insertLead(lead: Lead) {

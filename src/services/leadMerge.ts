@@ -3,6 +3,7 @@ import { normalizePhone } from "./phone";
 
 import {
     findLeadByPhone,
+    findLeadByNameAndTown,
     insertLead,
     updateLead
 }
@@ -28,10 +29,23 @@ export function mergeLead(
 
     /*
        No phone means:
-       keep as separate record
+       fall back to business_name + town matching
     */
 
     if(!phone){
+
+        const existing = findLeadByNameAndTown(
+            incoming.business_name ?? "",
+            incoming.town ?? ""
+        );
+
+        if(existing){
+            updateLead(
+                existing.id,
+                incoming
+            );
+            return existing.id;
+        }
 
         return insertLead(
             incoming

@@ -1,51 +1,70 @@
 import axios from "axios";
 
+export const OVERPASS_TIMEOUT_MS = 60000;
+
+export const OVERPASS_RETRY_ROUNDS = 2;
+
 const OVERPASS_SERVERS = [
-  "https://overpass.private.coffee/api/interpreter",
+  "https://invalid-overpass.private.coffee/api/interpreter",
 
-  "https://overpass.kumi.systems/api/interpreter",
+  "https://invalid-overpass.kumi.systems/api/interpreter",
 
-  "https://overpass-api.de/api/interpreter",
+  "https://invalid-overpass-api.de/api/interpreter",
 ];
 
-let preferredServer = 0;
-
 export async function runOverpassQuery(query: string) {
+  const totalAttempts = OVERPASS_SERVERS.length * OVERPASS_RETRY_ROUNDS;
+
   let lastError: any;
 
-  for (let i = 0; i < OVERPASS_SERVERS.length; i++) {
-    const attempt = (preferredServer + i) % OVERPASS_SERVERS.length;
+  for (let round = 0; round < OVERPASS_RETRY_ROUNDS; round++) {
+    for (let i = 0; i < OVERPASS_SERVERS.length; i++) {
+      const attemptNumber = round * OVERPASS_SERVERS.length + i + 1;
 
-    const url = OVERPASS_SERVERS[attempt];
+      const url = OVERPASS_SERVERS[i];
 
-    try {
-      console.log(`Overpass attempt ${attempt + 1}: ${url}`);
+      try {
+        console.log(`Attempt ${attemptNumber}/${totalAttempts}`);
 
-      const response = await axios.get(url, {
-        params: {
-          data: query,
-        },
+        console.log(`Endpoint: ${url}`);
 
-        timeout: 60000,
+        const response = await axios.get(url, {
+          params: {
+            data: query,
+          },
 
-        headers: {
-          "User-Agent": "VehicleLeadFinder/1.0",
-        },
-      });
+          timeout: OVERPASS_TIMEOUT_MS,
 
-      preferredServer = attempt;
+          headers: {
+            "User-Agent": "VehicleLeadFinder/1.0",
+          },
+        });
 
-      return response.data;
-    } catch (error: any) {
-      lastError = error;
+        return response.data;
+      } catch (error: any) {
+        lastError = error;
 
-      console.log(`Overpass failed, retrying...`);
+        const reason =
+          error.code === "ECONNABORTED"
+            ? "timeout"
+            : error.response?.status
+              ? `HTTP ${error.response.status}`
+              : error.message;
 
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+        console.log(`Reason: ${reason}`);
+
+        if (attemptNumber < totalAttempts) {
+          console.log("Retrying...");
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
     }
   }
 
-  throw lastError;
+  throw new Error(
+    `All overpass endpoints failed after ${totalAttempts} attempts.`,
+  );
 }
 
 export interface OverpassResponse {
