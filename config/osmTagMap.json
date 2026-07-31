@@ -1,0 +1,18 @@
+{
+  "Vehicle Repair": {
+    "mode": "tags",
+    "tags": [
+      { "key": "shop", "value": "car_repair" }
+    ]
+  },
+  "Vehicle Parts": {
+    "mode": "tags",
+    "tags": [
+      { "key": "shop", "value": "car_parts" },
+      { "key": "shop", "value": "tyres" }
+    ]
+  },
+  "Transport & Logistics": {
+    "mode": "name"
+  }
+}

@@ -1,6 +1,7 @@
 import { collectOSM } from "../../collectors/osm";
 import { mergeLead } from "../../services/leadMerge";
 import { generateZones } from "../../services/zones";
+import { resolveQuery } from "../../services/queryBuilder";
 
 export async function runOSMTest() {
   const zones = generateZones({
@@ -16,7 +17,9 @@ export async function runOSMTest() {
     radius: 3000,
   };
 
-  const leads = await collectOSM(testZone, "car");
+  const query = resolveQuery("Vehicle Repair", ["garage", "auto repair"]);
+
+  const leads = await collectOSM(testZone, "Vehicle Repair", query);
 
   for (const lead of leads) {
     mergeLead(lead);

@@ -3,6 +3,7 @@ import { mergeLead } from "../services/leadMerge";
 import { generateZones } from "../services/zones";
 import { Zone } from "../models/Zone";
 import { loadJson } from "../config/loader";
+import { resolveQuery, ResolvedQuery } from "../services/queryBuilder";
 import chalk from "chalk";
 
 interface Category {
@@ -16,7 +17,13 @@ interface Town {
   longitude: number;
 }
 
-const DELAY_BETWEEN_ZONES_MS = 3000;
+interface Task {
+  zone: Zone;
+  category: string;
+  query: ResolvedQuery;
+}
+
+const DELAY_BETWEEN_TASKS_MS = 3000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,66 +38,75 @@ export async function runCollection() {
   console.log(`Categories: ${categories.length}`);
   console.log(`Towns: ${towns.length}`);
 
-  const successfulZones: string[] = [];
-  const failedZones: string[] = [];
-  const failedZoneObjects: Zone[] = [];
+  const successfulTasks: string[] = [];
+  const failedTasks: string[] = [];
+  const failedTaskObjects: Task[] = [];
 
   for (const town of towns) {
     console.log(`\nTown: ${town.name}`);
 
-    const zones: Zone[] = generateZones(town);
+    const zones = generateZones(town);
 
     console.log(`Generated ${zones.length} zones`);
 
     for (const zone of zones) {
-      console.log(`\n   • ${zone.name}`);
+      for (const cat of categories) {
+        const query = resolveQuery(cat.category, cat.keywords);
 
-      try {
-        const leads = await collectOSM(zone, "car");
+        console.dir(query, { depth: null });
 
-        console.log(`Found ${leads.length} leads`);
+        const taskLabel = `${zone.name} [${cat.category}]`;
 
-        for (const lead of leads) {
-          mergeLead(lead);
+        console.log(`\n   • ${taskLabel}`);
+
+        try {
+          const leads = await collectOSM(zone, cat.category, query);
+
+          console.log(`Found ${leads.length} leads`);
+
+          for (const lead of leads) {
+            mergeLead(lead);
+          }
+
+          console.log(`Merged ${leads.length} lead(s) from ${taskLabel}.`);
+
+          successfulTasks.push(taskLabel);
+        } catch (error: any) {
+          console.error(chalk.red("FAILED"));
+
+          console.error(`Could not collect OSM data for ${taskLabel}`);
+
+          console.error(`Reason: ${error.message}`);
+
+          console.error(`No database changes were made for ${taskLabel}.`);
+
+          failedTasks.push(taskLabel);
+          failedTaskObjects.push({
+            zone,
+            category: cat.category,
+            query,
+          });
         }
 
-        console.log(`Merged ${leads.length} lead(s) from ${zone.name}.`);
-
-        successfulZones.push(zone.name);
-      } catch (error: any) {
-        console.error(chalk.red(`FAILED`));
-
-        console.error(
-          `Could not collect OSM data for zone: ${zone.name}`,
-        );
-
-        console.error(`Reason: ${error.message}`);
-
-        console.error(
-          `No database changes were made for ${zone.name}.`,
-        );
-
-        failedZones.push(zone.name);
-        failedZoneObjects.push(zone);
+        await delay(DELAY_BETWEEN_TASKS_MS);
       }
-
-      await delay(DELAY_BETWEEN_ZONES_MS);
     }
   }
 
-  if (failedZones.length > 0) {
+  if (failedTasks.length > 0) {
     console.log("\n----------------------------------------");
-    console.log(`\nRetrying failed zones (${failedZones.length})...\n`);
+    console.log(`\nRetrying failed tasks (${failedTasks.length})...\n`);
 
-    const remainingFailedZones: string[] = [];
+    const remainingFailedTasks: string[] = [];
 
-    for (let i = 0; i < failedZoneObjects.length; i++) {
-      const zone = failedZoneObjects[i];
+    for (let i = 0; i < failedTaskObjects.length; i++) {
+      const task = failedTaskObjects[i];
+      const taskLabel = `${task.zone.name} [${task.category}]`;
 
-      console.log(`\n   • ${zone.name}`);
+      console.log(`\n   • ${taskLabel}`);
 
       try {
-        const leads = await collectOSM(zone, "car");
+        const leads = await collectOSM(task.zone, task.category, task.query);
 
         console.log(`Found ${leads.length} leads`);
 
@@ -98,53 +114,49 @@ export async function runCollection() {
           mergeLead(lead);
         }
 
-        console.log(`Merged ${leads.length} lead(s) from ${zone.name}.`);
+        console.log(`Merged ${leads.length} lead(s) from ${taskLabel}.`);
 
-        successfulZones.push(zone.name);
+        successfulTasks.push(taskLabel);
       } catch (error: any) {
-        console.error(chalk.red(`FAILED`));
+        console.error(chalk.red("FAILED"));
 
-        console.error(
-          `Could not collect OSM data for zone: ${zone.name}`,
-        );
+        console.error(`Could not collect OSM data for ${taskLabel}`);
 
         console.error(`Reason: ${error.message}`);
 
-        console.error(
-          `No database changes were made for ${zone.name}.`,
-        );
+        console.error(`No database changes were made for ${taskLabel}.`);
 
-        remainingFailedZones.push(zone.name);
+        remainingFailedTasks.push(taskLabel);
       }
 
-      await delay(DELAY_BETWEEN_ZONES_MS);
+      await delay(DELAY_BETWEEN_TASKS_MS);
     }
 
-    failedZones.length = 0;
+    failedTasks.length = 0;
 
-    for (const name of remainingFailedZones) {
-      failedZones.push(name);
+    for (const name of remainingFailedTasks) {
+      failedTasks.push(name);
     }
   }
 
-  const totalZones = successfulZones.length + failedZones.length;
+  const totalTasks = successfulTasks.length + failedTasks.length;
 
   console.log("\n========================================");
   console.log("\nCollection finished\n");
-  console.log(`Total zones      : ${totalZones}`);
-  console.log(`Successful zones : ${successfulZones.length}`);
-  console.log(`Failed zones     : ${failedZones.length}\n`);
+  console.log(`Total tasks      : ${totalTasks}`);
+  console.log(`Successful tasks : ${successfulTasks.length}`);
+  console.log(`Failed tasks     : ${failedTasks.length}\n`);
 
-  if (failedZones.length > 0) {
-    console.log("Failed zones:\n");
+  if (failedTasks.length > 0) {
+    console.log("Failed tasks:\n");
 
-    for (const name of failedZones) {
+    for (const name of failedTasks) {
       console.log(`- ${name}`);
     }
 
     console.log("\nDatabase may be incomplete.");
   } else {
-    console.log("All zones collected successfully.");
+    console.log("All tasks collected successfully.");
   }
 
   console.log("\n========================================");
