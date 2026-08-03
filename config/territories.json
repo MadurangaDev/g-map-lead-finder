@@ -1,0 +1,75 @@
+[
+  {
+    "name": "Territory 01",
+    "areas": [
+      "Kundasale",
+      "Digana",
+      "Pallekele",
+      "Menikhinna",
+      "Tennekumbura",
+      "Gurudeniya",
+      "Balagolla",
+      "Haragama"
+    ]
+  },
+  {
+    "name": "Territory 02",
+    "areas": [
+      "Gampola",
+      "Gelioya",
+      "Daulagala",
+      "Nawalapitiya",
+      "Pussellawa",
+      "Deltota",
+      "Gahala",
+      "Handessa",
+      "Ulapane",
+      "Peradeniya South",
+      "Hatton"
+    ]
+  },
+  {
+    "name": "Territory 03",
+    "areas": [
+      "Kandy City",
+      "Katugastota",
+      "Mahaiyawa",
+      "Peradeniya",
+      "Getambe",
+      "Ampitiya",
+      "Bogambara",
+      "Asgiriya",
+      "Aruppola",
+      "Watapuluwa",
+      "Bahirawakanda"
+    ]
+  },
+  {
+    "name": "Territory 04",
+    "areas": [
+      "Teldeniya",
+      "Madawala",
+      "Udispattuwa",
+      "Udadumbara",
+      "Minipe",
+      "Hasalaka",
+      "Wilgamuwa Border",
+      "Hunnasgiriya",
+      "Victoria",
+      "Randenigala Area"
+    ]
+  },
+  {
+    "name": "Territory 05",
+    "areas": [
+      "Mawanella",
+      "Kadugannawa",
+      "Pilimathalawa",
+      "Balana",
+      "Aladeniya",
+      "Galagedara",
+      "Rambukkana border",
+      "Hingula"
+    ]
+  }
+]

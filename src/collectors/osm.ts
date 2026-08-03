@@ -2,6 +2,7 @@ import { Zone } from "../models/Zone";
 import { Lead } from "../models/Lead";
 import { runOverpassQuery } from "../services/overpassClient";
 import { ResolvedQuery } from "../services/queryBuilder";
+import { logger } from "../utils/logger";
 
 export async function collectOSM(
   zone: Zone,
@@ -15,14 +16,14 @@ export async function collectOSM(
   try {
     data = await runOverpassQuery(overpassQuery);
   } catch (error: any) {
-    console.error(`OSM collection FAILED for zone: ${zone.name}`);
-    console.error(`Reason: ${error.message}`);
+    logger.error(`OSM collection FAILED for zone: ${zone.name}`);
+    logger.error(`Reason: ${error.message}`);
     throw error;
   }
 
   const elements = data.elements;
 
-  console.log("OSM elements found:", elements.length);
+  logger.success(`OSM elements found: ${elements.length}`);
 
   return elements.map((item: any) => ({
     business_name: item.tags?.name ?? "Unknown",

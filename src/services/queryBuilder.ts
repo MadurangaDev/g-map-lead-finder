@@ -1,5 +1,6 @@
 import fs from "fs";
 import { loadJson } from "../config/loader";
+import { logger } from "../utils/logger";
 
 export interface OsmTag {
   key: string;
@@ -57,7 +58,7 @@ export function resolveQuery(category: string, keywords: string[]): ResolvedQuer
     }
   }
 
-  console.warn(
+  logger.warn(
     `No OSM tag mapping found for category "${category}". Falling back to name search.`
   );
 

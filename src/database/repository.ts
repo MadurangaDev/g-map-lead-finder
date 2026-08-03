@@ -28,6 +28,29 @@ export function findLeadByPhone(phone: string): LeadRow | undefined {
   } as LeadRow;
 }
 
+export function findLeadByReferenceUrl(
+  reference_url: string,
+): LeadRow | undefined {
+  const row = db
+    .prepare(
+      `
+            SELECT *
+            FROM leads
+            WHERE reference_url = ?
+            `,
+    )
+    .get(reference_url) as any;
+
+  if (!row) {
+    return undefined;
+  }
+
+  return {
+    ...row,
+    sources: row.sources ? JSON.parse(row.sources) : [],
+  } as LeadRow;
+}
+
 export function findLeadByNameAndTown(
   name: string,
   town: string
@@ -40,15 +63,15 @@ export function findLeadByNameAndTown(
 
   const candidates = db
     .prepare(`
-      SELECT *
-      FROM leads
-      WHERE phone_normalized IS NULL
+        SELECT *
+        FROM leads
+        WHERE phone_normalized IS NULL
     `)
     .all() as LeadRow[];
 
   const match = candidates.find(
-    row =>
-      normalizeBusinessKey(row.business_name, row.town) === key
+    (row) =>
+      normalizeBusinessKey(row.business_name, row.town) === key,
   );
 
   if (!match) {
@@ -118,8 +141,8 @@ export function updateLead(id: number, lead: Lead) {
         business_name = COALESCE(?, business_name),
         address = COALESCE(?, address),
         category = COALESCE(?, category),
-        town = COALESCE(?, town),
-        zone = COALESCE(?, zone),
+        town = COALESCE(town, ?),
+        zone = COALESCE(zone, ?),
         latitude = COALESCE(?, latitude),
         longitude = COALESCE(?, longitude),
         rating = COALESCE(?, rating),

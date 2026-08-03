@@ -1,54 +1,23 @@
 import { Zone } from "../models/Zone";
 
-interface TownInput {
+export const SEARCH_RADIUS_METERS = 3000;
+
+interface AreaCoordinates {
   name: string;
-
   latitude: number;
-
   longitude: number;
 }
 
-export function generateZones(town: TownInput, radius = 3000): Zone[] {
-  const offset = 0.03;
-
+export function generateLocationZones(
+  area: AreaCoordinates,
+  radius = SEARCH_RADIUS_METERS
+): Zone[] {
   return [
     {
-      town: town.name,
-      name: `${town.name}-center`,
-      latitude: town.latitude,
-      longitude: town.longitude,
-      radius,
-    },
-
-    {
-      town: town.name,
-      name: `${town.name}-north`,
-      latitude: town.latitude + offset,
-      longitude: town.longitude,
-      radius,
-    },
-
-    {
-      town: town.name,
-      name: `${town.name}-south`,
-      latitude: town.latitude - offset,
-      longitude: town.longitude,
-      radius,
-    },
-
-    {
-      town: town.name,
-      name: `${town.name}-east`,
-      latitude: town.latitude,
-      longitude: town.longitude + offset,
-      radius,
-    },
-
-    {
-      town: town.name,
-      name: `${town.name}-west`,
-      latitude: town.latitude,
-      longitude: town.longitude - offset,
+      town: area.name,
+      name: area.name,
+      latitude: area.latitude,
+      longitude: area.longitude,
       radius,
     },
   ];

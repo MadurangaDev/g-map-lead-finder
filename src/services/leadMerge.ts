@@ -4,6 +4,7 @@ import { normalizePhone } from "./phone";
 import {
     findLeadByPhone,
     findLeadByNameAndTown,
+    findLeadByReferenceUrl,
     insertLead,
     updateLead
 }
@@ -28,8 +29,38 @@ export function mergeLead(
 
 
     /*
-       No phone means:
-       fall back to business_name + town matching
+
+       Highest-priority match: a stable reference_url
+       (e.g. an OpenStreetMap element URL). Rediscovery of the
+       same element from overlapping area searches must merge
+       into the existing row rather than insert a duplicate.
+
+    */
+
+    if(incoming.reference_url){
+
+        const existing =
+            findLeadByReferenceUrl(incoming.reference_url);
+
+        if(existing){
+
+            updateLead(
+                existing.id,
+                incoming
+            );
+
+            return existing.id;
+
+        }
+
+    }
+
+
+    /*
+
+       No stable reference_url (or no existing match):
+       fall back to phone-based matching.
+
     */
 
     if(!phone){
@@ -40,6 +71,7 @@ export function mergeLead(
         );
 
         if(existing){
+
             updateLead(
                 existing.id,
                 incoming

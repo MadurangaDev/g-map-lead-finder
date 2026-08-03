@@ -1,0 +1,194 @@
+{
+  "Aladeniya": {
+    "latitude": 7.3313688,
+    "longitude": 80.5710654
+  },
+  "Ampitiya": {
+    "latitude": 7.2678653,
+    "longitude": 80.666297
+  },
+  "Aruppola": {
+    "latitude": 7.3097464,
+    "longitude": 80.6462361
+  },
+  "Asgiriya": {
+    "latitude": 7.3005905,
+    "longitude": 80.6275001
+  },
+  "Bahirawakanda": {
+    "latitude": 7.295351,
+    "longitude": 80.6291982
+  },
+  "Balagolla": {
+    "latitude": 7.2854841,
+    "longitude": 80.7159128
+  },
+  "Balana": {
+    "latitude": 7.2681139,
+    "longitude": 80.4889888
+  },
+  "Bogambara": {
+    "latitude": 7.2904406,
+    "longitude": 80.6353467
+  },
+  "Daulagala": {
+    "latitude": 7.2265148,
+    "longitude": 80.5774149
+  },
+  "Deltota": {
+    "latitude": 7.1726569,
+    "longitude": 80.6959966
+  },
+  "Digana": {
+    "latitude": 7.2964937,
+    "longitude": 80.7334168
+  },
+  "Gahala": {
+    "latitude": 7.2167,
+    "longitude": 80.6667
+  },
+  "Galagedara": {
+    "latitude": 7.3729671,
+    "longitude": 80.5246925
+  },
+  "Gampola": {
+    "latitude": 7.1636487,
+    "longitude": 80.5702744
+  },
+  "Gelioya": {
+    "latitude": 7.2139165,
+    "longitude": 80.5986641
+  },
+  "Getambe": {
+    "latitude": 7.2691483,
+    "longitude": 80.6041033
+  },
+  "Gurudeniya": {
+    "latitude": 7.2692201,
+    "longitude": 80.6867188
+  },
+  "Handessa": {
+    "latitude": 7.231449,
+    "longitude": 80.5801593
+  },
+  "Haragama": {
+    "latitude": 7.2605293,
+    "longitude": 80.7155791
+  },
+  "Hasalaka": {
+    "latitude": 7.3520948,
+    "longitude": 80.9506061
+  },
+  "Hatton": {
+    "latitude": 6.8916333,
+    "longitude": 80.5984591
+  },
+  "Hingula": {
+    "latitude": 7.2475051,
+    "longitude": 80.4680664
+  },
+  "Hunnasgiriya": {
+    "latitude": 7.388718,
+    "longitude": 80.6992441
+  },
+  "Kadugannawa": {
+    "latitude": 7.2572795,
+    "longitude": 80.5195206
+  },
+  "Kandy City": {
+    "latitude": 7.2931208,
+    "longitude": 80.6350358
+  },
+  "Katugastota": {
+    "latitude": 7.3220837,
+    "longitude": 80.6249552
+  },
+  "Kundasale": {
+    "latitude": 7.2804536,
+    "longitude": 80.6844649
+  },
+  "Madawala": {
+    "latitude": 7.3285799,
+    "longitude": 80.6735077
+  },
+  "Mahaiyawa": {
+    "latitude": 7.3016627,
+    "longitude": 80.6331691
+  },
+  "Mawanella": {
+    "latitude": 7.2523524,
+    "longitude": 80.4469352
+  },
+  "Menikhinna": {
+    "latitude": 7.3157156,
+    "longitude": 80.7018465
+  },
+  "Minipe": {
+    "latitude": 7.2719837,
+    "longitude": 80.9905456
+  },
+  "Nawalapitiya": {
+    "latitude": 7.0558938,
+    "longitude": 80.5350145
+  },
+  "Pallekele": {
+    "latitude": 7.2805314,
+    "longitude": 80.6960665
+  },
+  "Peradeniya": {
+    "latitude": 7.2642107,
+    "longitude": 80.5930652
+  },
+  "Peradeniya South": {
+    "latitude": 7.2657084,
+    "longitude": 80.5944427
+  },
+  "Pilimathalawa": {
+    "latitude": 7.2672,
+    "longitude": 80.5667
+  },
+  "Pussellawa": {
+    "latitude": 7.110145,
+    "longitude": 80.6337679
+  },
+  "Rambukkana border": {
+    "latitude": 7.3239273,
+    "longitude": 80.3957479
+  },
+  "Randenigala Area": {
+    "latitude": 7.2020483,
+    "longitude": 80.9243368
+  },
+  "Teldeniya": {
+    "latitude": 7.309641,
+    "longitude": 80.764946
+  },
+  "Tennekumbura": {
+    "latitude": 7.2836329,
+    "longitude": 80.6627931
+  },
+  "Udadumbara": {
+    "latitude": 7.3898117,
+    "longitude": 80.8985955
+  },
+  "Udispattuwa": {
+    "latitude": 7.3135019,
+    "longitude": 80.784683
+  },
+  "Ulapane": {
+    "latitude": 7.1055883,
+    "longitude": 80.5639046
+  },
+  "Victoria": {
+    "latitude": 7.2406287,
+    "longitude": 80.7845678
+  },
+  "Watapuluwa": {
+    "latitude": 7.318936,
+    "longitude": 80.6414666
+  },
+  "Wilgamuwa Border": {
+    "latitude": 7.5158806,
+    "longitude": 80.9204886
+  }
+}

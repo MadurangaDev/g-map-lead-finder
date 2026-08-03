@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node src/cli/index.ts"
+    "start": "ts-node src/cli/index.ts",
+    "generate-coordinates": "ts-node src/cli/commands/generateCoordinates.ts"
   },
   "repository": {
     "type": "git",

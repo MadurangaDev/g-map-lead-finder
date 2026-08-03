@@ -1,19 +1,15 @@
-import { generateZones } from "../../services/zones";
+import { generateLocationZones, SEARCH_RADIUS_METERS } from "../../services/zones";
 import { insertZone } from "../../database/zoneRepository";
 
 export function runZoneTest() {
-  const town = {
+  const zones = generateLocationZones({
     name: "Kandy",
-
     latitude: 7.2906,
-
     longitude: 80.6337,
-  };
-
-  const zones = generateZones(town);
+  });
 
   zones.forEach((zone) => {
-    insertZone(zone);
+    insertZone({ ...zone, radius: SEARCH_RADIUS_METERS });
   });
 
   console.table(zones);
