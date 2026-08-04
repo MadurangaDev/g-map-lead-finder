@@ -65,7 +65,6 @@ export function findLeadByNameAndTown(
     .prepare(`
         SELECT *
         FROM leads
-        WHERE phone_normalized IS NULL
     `)
     .all() as LeadRow[];
 

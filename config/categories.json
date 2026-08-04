@@ -16,5 +16,13 @@
       "courier",
       "delivery service"
     ]
+  },
+  {
+    "category": "Vehicle Parts",
+    "keywords": [
+      "auto parts",
+      "spare parts",
+      "vehicle accessories"
+    ]
   }
 ]
