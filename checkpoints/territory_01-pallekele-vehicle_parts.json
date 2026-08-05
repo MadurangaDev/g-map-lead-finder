@@ -1,0 +1,16 @@
+{
+  "territory": "Territory 01",
+  "area": "Pallekele",
+  "category": "Vehicle Parts",
+  "collectors": [
+    "osm",
+    "googleMaps"
+  ],
+  "completedCollectors": [
+    "osm",
+    "googleMaps"
+  ],
+  "startedAt": "2026-08-05T10:34:13.758Z",
+  "completedAt": "2026-08-05T10:42:48.410Z",
+  "csvExported": true
+}
