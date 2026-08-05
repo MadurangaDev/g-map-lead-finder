@@ -1,5 +1,8 @@
 import { collectOSM } from "../collectors/osm";
-import { collectGoogleMaps, closeGoogleMapsBrowser } from "../collectors/googleMaps";
+import {
+  collectGoogleMaps,
+  closeGoogleMapsBrowser,
+} from "../collectors/googleMaps";
 import { mergeLead } from "../services/leadMerge";
 import { generateLocationZones } from "../services/zones";
 import { Zone } from "../models/Zone";
@@ -9,18 +12,29 @@ import { resolveQuery, ResolvedQuery } from "../services/queryBuilder";
 import { logger } from "../utils/logger";
 import { ProgressDashboard, formatDuration } from "../utils/progressDashboard";
 import { printEndpointStats } from "../services/overpassClient";
+import {
+  CollectionCheckpoint,
+  createCheckpoint,
+  markCollectorComplete,
+  markCsvExported,
+  isCheckpointComplete,
+  getIncompleteCollectors,
+  findCheckpoint,
+  deleteCheckpoint,
+} from "../services/checkpoint";
+import { exportCollectionToCsv } from "../services/csvExporter";
 
-interface Category {
+export interface Category {
   category: string;
   keywords: string[];
 }
 
-interface Territory {
+export interface Territory {
   name: string;
   areas: string[];
 }
 
-interface AreaCoordinate {
+export interface AreaCoordinate {
   latitude: number;
   longitude: number;
 }
@@ -29,7 +43,11 @@ interface CollectorConfig {
   collectors: Record<string, boolean>;
 }
 
-type CollectorFn = (zone: Zone, category: string, query: ResolvedQuery) => Promise<Lead[]>;
+export type CollectorFn = (
+  zone: Zone,
+  category: string,
+  query: ResolvedQuery,
+) => Promise<Lead[]>;
 
 const collectorRegistry: Record<string, CollectorFn> = {
   osm: (zone, category, query) => collectOSM(zone, category, query),
@@ -43,13 +61,40 @@ interface Task {
   collectorName: string;
 }
 
+interface JobSpec {
+  territory: string;
+  area: string;
+  category: string;
+  keywords: string[];
+}
+
+interface JobPlan {
+  job: JobSpec;
+  jobMode: "fresh" | "restart" | "resume";
+  checkpoint: CollectionCheckpoint;
+  collectorsToRun: string[];
+  tasks: Task[];
+}
+
+export interface CollectionScope {
+  territory?: string;
+  area?: string;
+  category?: string;
+}
+
+export interface RunCollectionOptions {
+  scope?: CollectionScope;
+  resumeMode?: "resume" | "restart" | "fresh";
+  fullRestart?: boolean;
+}
+
 const DELAY_BETWEEN_TASKS_MS = 3000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getEnabledCollectors(): string[] {
+export function getEnabledCollectors(): string[] {
   try {
     const config = loadJson<CollectorConfig>("config/collectors.json");
     const enabled = Object.entries(config.collectors)
@@ -57,42 +102,313 @@ function getEnabledCollectors(): string[] {
       .map(([name, _]) => name);
 
     if (enabled.length === 0) {
-      logger.warn("No collectors enabled in config/collectors.json. Falling back to OSM.");
+      logger.warn(
+        "No collectors enabled in config/collectors.json. Falling back to OSM.",
+      );
       return ["osm"];
     }
 
     return enabled;
   } catch {
     const envCollector = (process.env.COLLECTOR || "osm") as string;
-    const normalized = envCollector === "google-maps" ? "googleMaps" : envCollector;
+    const normalized =
+      envCollector === "google-maps" ? "googleMaps" : envCollector;
     return [normalized];
   }
 }
 
-function countTotalTasks(
-  territories: Territory[],
-  coordinates: Record<string, AreaCoordinate>,
-  categories: Category[],
-  enabledCollectors: string[]
-): number {
-  let total = 0;
-  for (const territory of territories) {
-    for (const areaName of territory.areas) {
-      const coords = coordinates[areaName];
-      if (!coords) continue;
-      const zones = generateLocationZones({
-        name: areaName,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
-      total += zones.length * categories.length * enabledCollectors.length;
-    }
-  }
-  return total;
+interface RunStats {
+  processed: number;
+  saved: number;
+  skipped: number;
+  errors: number;
 }
 
-export async function runCollection() {
-  logger.info("Starting collection...");
+let interruptRequested = false;
+let interruptHandlerInstalled = false;
+
+function installInterruptHandler(): void {
+  if (interruptHandlerInstalled) return;
+  interruptHandlerInstalled = true;
+
+  const handleInterrupt = () => {
+    if (interruptRequested) {
+      process.exit(130);
+    }
+    interruptRequested = true;
+    logger.warn(
+      "Interrupt received. Finishing current task and saving progress...",
+    );
+    closeGoogleMapsBrowser();
+  };
+
+  process.on("SIGINT", handleInterrupt);
+  process.on("SIGTERM", handleInterrupt);
+}
+
+function buildJobs(
+  territories: Territory[],
+  categories: Category[],
+  coordinates: Record<string, AreaCoordinate>,
+  scope?: CollectionScope,
+): JobSpec[] {
+  const jobs: JobSpec[] = [];
+
+  for (const territory of territories) {
+    if (scope?.territory && territory.name !== scope.territory) {
+      continue;
+    }
+
+    for (const area of territory.areas) {
+      if (scope?.area && area !== scope.area) {
+        continue;
+      }
+
+      if (!coordinates[area]) {
+        continue;
+      }
+
+      for (const category of categories) {
+        if (scope?.category && category.category !== scope.category) {
+          continue;
+        }
+
+        jobs.push({
+          territory: territory.name,
+          area,
+          category: category.category,
+          keywords: category.keywords,
+        });
+      }
+    }
+  }
+
+  return jobs;
+}
+
+function resolveJobMode(
+  job: JobSpec,
+  existing: CollectionCheckpoint | null,
+  options: RunCollectionOptions,
+  isSingleScope: boolean,
+): "fresh" | "restart" | "resume" | "skip" {
+  if (options.fullRestart) {
+    return "restart";
+  }
+
+  if (isSingleScope) {
+    return (options.resumeMode ?? "fresh") as "fresh" | "restart" | "resume";
+  }
+
+  if (existing && isCheckpointComplete(existing)) {
+    return "skip";
+  }
+
+  return existing ? "resume" : "fresh";
+}
+
+function resolvePlan(
+  job: JobSpec,
+  existing: CollectionCheckpoint | null,
+  enabledCollectors: string[],
+  jobMode: "fresh" | "restart" | "resume",
+  coordinates: Record<string, AreaCoordinate>,
+): JobPlan {
+  let checkpoint: CollectionCheckpoint;
+  let collectorsToRun: string[];
+
+  if (jobMode === "restart") {
+    deleteCheckpoint(job.territory, job.area, job.category);
+    logger.info("Previous checkpoint removed");
+    logger.info("Starting fresh...");
+    checkpoint = createCheckpoint(
+      job.territory,
+      job.area,
+      job.category,
+      enabledCollectors,
+    );
+    collectorsToRun = enabledCollectors;
+  } else if (jobMode === "resume" && existing) {
+    logger.info("Checkpoint found");
+    logger.info("Resuming...");
+    checkpoint = existing;
+    const incomplete = getIncompleteCollectors(existing);
+    collectorsToRun = incomplete;
+  } else {
+    checkpoint = createCheckpoint(
+      job.territory,
+      job.area,
+      job.category,
+      enabledCollectors,
+    );
+    collectorsToRun = enabledCollectors;
+  }
+
+  const coords = coordinates[job.area];
+  const zones = generateLocationZones({
+    name: job.area,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+  });
+
+  const query = resolveQuery(job.category, job.keywords);
+
+  const tasks: Task[] = [];
+  for (const zone of zones) {
+    for (const collectorName of collectorsToRun) {
+      tasks.push({ zone, category: job.category, query, collectorName });
+    }
+  }
+
+  return { job, jobMode, checkpoint, collectorsToRun, tasks };
+}
+
+function taskLabel(task: Task): string {
+  return `${task.zone.name} [${task.category}] - ${task.collectorName}`;
+}
+
+async function runTask(task: Task): Promise<{ saved: number }> {
+  const collect = collectorRegistry[task.collectorName];
+  if (!collect) {
+    throw new Error(`Unknown collector: ${task.collectorName}`);
+  }
+
+  const leads = await collect(task.zone, task.category, task.query);
+
+  for (const lead of leads) {
+    mergeLead(lead);
+  }
+
+  logger.success(`Merged ${leads.length} lead(s) from ${taskLabel(task)}.`);
+  return { saved: leads.length };
+}
+
+async function executeTask(
+  task: Task,
+  dashboard: ProgressDashboard,
+  stats: RunStats,
+  failedTasks: Task[],
+): Promise<void> {
+  const label = taskLabel(task);
+  dashboard.update({ currentTask: label });
+  logger.info(`\n   • ${label}`);
+
+  try {
+    const result = await runTask(task);
+    stats.processed++;
+    stats.saved += result.saved;
+    dashboard.update({ processed: stats.processed, saved: stats.saved });
+  } catch (error: any) {
+    logger.error("FAILED");
+    logger.error(`Collector failed: ${task.collectorName}`);
+    logger.error(`Could not collect data for ${label}`);
+    logger.error(`Reason: ${error.message}`);
+    logger.error(`No database changes were made for ${label}.`);
+    failedTasks.push(task);
+    stats.processed++;
+    stats.errors++;
+    dashboard.update({ processed: stats.processed, errors: stats.errors });
+  }
+
+  dashboard.render();
+}
+
+async function runJob(
+  plan: JobPlan,
+  dashboard: ProgressDashboard,
+  stats: RunStats,
+  failedTaskLabels: string[],
+): Promise<void> {
+  const job = plan.job;
+
+  logger.info(`Selected Territory: ${job.territory}`);
+  logger.info(`Selected Area: ${job.area}`);
+  logger.info(`Selected Category: ${job.category}`);
+
+  const tasks = plan.tasks;
+  const failedTasks: Task[] = [];
+
+  let activeCollector: string | null = null;
+
+  if (tasks.length === 0) {
+    logger.info(
+      "All collectors already completed for this selection. Proceeding to export...",
+    );
+  } else {
+    for (const task of tasks) {
+      if (interruptRequested) {
+        break;
+      }
+
+      if (task.collectorName !== activeCollector) {
+        logger.info(`Collector: ${task.collectorName}`);
+        activeCollector = task.collectorName;
+      }
+
+      await executeTask(task, dashboard, stats, failedTasks);
+      await delay(DELAY_BETWEEN_TASKS_MS);
+    }
+
+    if (failedTasks.length > 0 && !interruptRequested) {
+      logger.info("\n----------------------------------------");
+      logger.info(`Retrying failed tasks (${failedTasks.length})...`);
+
+      const stillFailed: Task[] = [];
+      for (const task of failedTasks) {
+        if (interruptRequested) {
+          break;
+        }
+        await executeTask(task, dashboard, stats, stillFailed);
+        await delay(DELAY_BETWEEN_TASKS_MS);
+      }
+
+      failedTasks.length = 0;
+      failedTasks.push(...stillFailed);
+    }
+
+    for (const collector of plan.collectorsToRun) {
+      const collectorTasks = tasks.filter(
+        (t) => t.collectorName === collector,
+      );
+      const allSucceeded = collectorTasks.every(
+        (t) =>
+          !failedTasks.some(
+            (f) =>
+              f.zone.name === t.zone.name &&
+              f.category === t.category &&
+              f.collectorName === t.collectorName,
+          ),
+      );
+      if (allSucceeded) {
+        if (!plan.checkpoint.completedCollectors.includes(collector)) {
+          markCollectorComplete(plan.checkpoint, collector);
+          logger.success(`Collector "${collector}" marked complete.`);
+        }
+      }
+    }
+
+    for (const task of failedTasks) {
+      failedTaskLabels.push(taskLabel(task));
+    }
+  }
+
+  const allCollectorsComplete =
+    plan.checkpoint.collectors.length > 0 &&
+    plan.checkpoint.completedCollectors.length ===
+      plan.checkpoint.collectors.length;
+
+  if (allCollectorsComplete && !interruptRequested) {
+    exportCollectionToCsv(job.territory, job.area, job.category);
+    if (!plan.checkpoint.csvExported) {
+      markCsvExported(plan.checkpoint);
+    }
+  }
+}
+
+export async function runCollection(
+  options: RunCollectionOptions = {},
+): Promise<void> {
+  interruptRequested = false;
 
   const categories = loadJson<Category[]>("config/categories.json");
   const territories = loadJson<Territory[]>("config/territories.json");
@@ -101,27 +417,64 @@ export async function runCollection() {
 
   const enabledCollectors = getEnabledCollectors();
 
-  logger.info(`Enabled collectors: ${enabledCollectors.join(", ")}`);
+  logger.info(`Collectors: ${enabledCollectors.join(", ")}`);
 
   const unknownCollectors = enabledCollectors.filter(
-    (name) => !collectorRegistry[name]
+    (name) => !collectorRegistry[name],
   );
   if (unknownCollectors.length > 0) {
     logger.error(
-      `Unknown collector(s): ${unknownCollectors.join(", ")}. Aborting.`
+      `Unknown collector(s): ${unknownCollectors.join(", ")}. Aborting.`,
     );
     return;
   }
 
   logger.info(`Categories: ${categories.length}`);
   logger.info(`Territories: ${territories.length}`);
-  logger.info(
-    `Areas: ${territories.flatMap((t) => t.areas).length}`
-  );
+  logger.info(`Areas: ${territories.flatMap((t) => t.areas).length}`);
+
+  const scope = options.scope;
+  const isSingleScope = !!(scope && scope.territory && scope.area && scope.category);
+
+  const jobs = buildJobs(territories, categories, coordinates, scope);
+
+  if (jobs.length === 0) {
+    logger.warn("No collection jobs match the current selection.");
+    return;
+  }
+
+  const plans: JobPlan[] = [];
+
+  for (const job of jobs) {
+    const existing = findCheckpoint(
+      job.territory,
+      job.area,
+      job.category,
+    );
+    const jobMode = resolveJobMode(
+      job,
+      existing,
+      options,
+      isSingleScope,
+    );
+
+    if (jobMode === "skip") {
+      continue;
+    }
+
+    plans.push(
+      resolvePlan(job, existing, enabledCollectors, jobMode, coordinates),
+    );
+  }
+
+  if (plans.length === 0) {
+    logger.info("All selected collections are already complete.");
+    return;
+  }
+
+  const totalTasks = plans.reduce((sum, plan) => sum + plan.tasks.length, 0);
 
   const startTime = Date.now();
-
-  const totalTasks = countTotalTasks(territories, coordinates, categories, enabledCollectors);
   const dashboard = new ProgressDashboard({
     total: totalTasks,
     processed: 0,
@@ -132,147 +485,25 @@ export async function runCollection() {
     currentTask: "",
   });
 
+  const stats: RunStats = {
+    processed: 0,
+    saved: 0,
+    skipped: 0,
+    errors: 0,
+  };
+
+  const failedTaskLabels: string[] = [];
+
+  installInterruptHandler();
   logger.setDashboard(dashboard);
   dashboard.render();
 
-  const successfulTasks: string[] = [];
-  const failedTasks: string[] = [];
-  const failedTaskObjects: Task[] = [];
-
-  let processed = 0;
-  let saved = 0;
-  let skipped = 0;
-  let errors = 0;
-
   try {
-    for (const territory of territories) {
-      logger.info(`Territory: ${territory.name}`);
-
-      for (const areaName of territory.areas) {
-        const coords = coordinates[areaName];
-
-        if (!coords) {
-          logger.warn(`Coordinates not found for area: ${areaName}`);
-          logger.warn(
-            `Skipping ${areaName}. Run 'npm run generate-coordinates' to generate coordinates.`
-          );
-          skipped++;
-          dashboard.update({ skipped });
-          dashboard.render();
-          continue;
-        }
-
-        const zones = generateLocationZones({
-          name: areaName,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        });
-
-        logger.info(`  Area: ${areaName} (${zones.length} zone(s))`);
-
-        for (const zone of zones) {
-          for (const cat of categories) {
-            const query = resolveQuery(cat.category, cat.keywords);
-
-            for (const collectorName of enabledCollectors) {
-              const taskLabel = `${zone.name} [${cat.category}] - ${collectorName}`;
-
-              dashboard.update({ currentTask: taskLabel });
-              logger.info(`\n   • ${taskLabel}`);
-              logger.info(`Collector: ${collectorName}`);
-
-              try {
-                const collect = collectorRegistry[collectorName];
-                const leads = await collect(zone, cat.category, query);
-
-                for (const lead of leads) {
-                  mergeLead(lead);
-                }
-
-                logger.success(`Merged ${leads.length} lead(s) from ${taskLabel}.`);
-
-                successfulTasks.push(taskLabel);
-                processed++;
-                saved += leads.length;
-                dashboard.update({ processed, saved });
-                dashboard.render();
-              } catch (error: any) {
-                logger.error("FAILED");
-                logger.error(`Collector failed: ${collectorName}`);
-                logger.error(`Could not collect data for ${taskLabel}`);
-                logger.error(`Reason: ${error.message}`);
-                logger.error(`No database changes were made for ${taskLabel}.`);
-
-                failedTasks.push(taskLabel);
-                failedTaskObjects.push({
-                  zone,
-                  category: cat.category,
-                  query,
-                  collectorName,
-                });
-                processed++;
-                errors++;
-                dashboard.update({ processed, errors });
-                dashboard.render();
-              }
-
-              await delay(DELAY_BETWEEN_TASKS_MS);
-            }
-          }
-        }
+    for (const plan of plans) {
+      if (interruptRequested) {
+        break;
       }
-    }
-
-    if (failedTasks.length > 0) {
-      logger.info("\n----------------------------------------");
-      logger.info(`Retrying failed tasks (${failedTasks.length})...`);
-
-      const remainingFailedTasks: string[] = [];
-
-      for (let i = 0; i < failedTaskObjects.length; i++) {
-        const task = failedTaskObjects[i];
-        const taskLabel = `${task.zone.name} [${task.category}] - ${task.collectorName}`;
-
-        dashboard.update({ currentTask: taskLabel });
-        logger.info(`\n   • ${taskLabel}`);
-
-        try {
-          const collect = collectorRegistry[task.collectorName];
-          const leads = await collect(task.zone, task.category, task.query);
-
-          for (const lead of leads) {
-            mergeLead(lead);
-          }
-
-          logger.success(`Merged ${leads.length} lead(s) from ${taskLabel}.`);
-
-          successfulTasks.push(taskLabel);
-          processed++;
-          saved += leads.length;
-          dashboard.update({ processed, saved });
-          dashboard.render();
-        } catch (error: any) {
-          logger.error("FAILED");
-          logger.error(`Collector failed: ${task.collectorName}`);
-          logger.error(`Could not collect data for ${taskLabel}`);
-          logger.error(`Reason: ${error.message}`);
-          logger.error(`No database changes were made for ${taskLabel}.`);
-
-          remainingFailedTasks.push(taskLabel);
-          processed++;
-          errors++;
-          dashboard.update({ processed, errors });
-          dashboard.render();
-        }
-
-        await delay(DELAY_BETWEEN_TASKS_MS);
-      }
-
-      failedTasks.length = 0;
-
-      for (const name of remainingFailedTasks) {
-        failedTasks.push(name);
-      }
+      await runJob(plan, dashboard, stats, failedTaskLabels);
     }
   } finally {
     dashboard.erase();
@@ -288,25 +519,33 @@ export async function runCollection() {
   process.stdout.write("\n========================================\n");
   process.stdout.write("\nCollection finished\n");
   process.stdout.write(`Total tasks      : ${totalTasks}\n`);
-  process.stdout.write(`Successful tasks : ${processed - errors}\n`);
-  process.stdout.write(`Failed tasks     : ${errors}\n`);
-  process.stdout.write(`Saved leads      : ${saved}\n`);
-  process.stdout.write(`Skipped          : ${skipped}\n`);
-  process.stdout.write(`Errors           : ${errors}\n`);
+  process.stdout.write(`Successful tasks : ${stats.processed - stats.errors}\n`);
+  process.stdout.write(`Failed tasks     : ${stats.errors}\n`);
+  process.stdout.write(`Saved leads      : ${stats.saved}\n`);
+  process.stdout.write(`Skipped          : ${stats.skipped}\n`);
+  process.stdout.write(`Errors           : ${stats.errors}\n`);
   process.stdout.write(`Duration         : ${formatDuration(elapsed)}\n`);
   process.stdout.write("\n========================================\n");
 
-  printEndpointStats();
+  if (enabledCollectors.includes("osm")) {
+    printEndpointStats();
+  }
 
-  if (failedTasks.length > 0) {
+  if (failedTaskLabels.length > 0) {
     logger.info("Failed tasks:\n");
-
-    for (const name of failedTasks) {
+    for (const name of failedTaskLabels) {
       logger.info(`- ${name}`);
     }
-
     logger.warn("\nDatabase may be incomplete.");
+  } else if (isSingleScope) {
+    logger.success("Selected collection completed successfully.\n");
   } else {
-    logger.info("All tasks collected successfully.");
+    logger.success("All collections completed successfully.\n");
+  }
+
+  if (interruptRequested) {
+    logger.warn(
+      "\nCollection interrupted. Progress has been saved. Resume next time.",
+    );
   }
 }

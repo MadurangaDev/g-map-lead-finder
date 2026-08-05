@@ -1,0 +1,16 @@
+{
+  "territory": "Territory 01",
+  "area": "Digana",
+  "category": "Vehicle Parts",
+  "collectors": [
+    "osm",
+    "googleMaps"
+  ],
+  "completedCollectors": [
+    "osm",
+    "googleMaps"
+  ],
+  "startedAt": "2026-08-05T09:37:51.620Z",
+  "completedAt": "2026-08-05T09:57:46.237Z",
+  "csvExported": true
+}

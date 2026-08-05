@@ -1,6 +1,6 @@
 [
   {
-    "name": "Territorry 01",
+    "name": "Territory 01",
     "areas": [
       "Kundasale",
       "Digana",
@@ -13,7 +13,7 @@
     ]
   },
   {
-    "name": "Territorry 02",
+    "name": "Territory 02",
     "areas": [
       "Gampola",
       "Gelioya",
@@ -29,7 +29,7 @@
     ]
   },
   {
-    "name": "Territorry 03",
+    "name": "Territory 03",
     "areas": [
       "Kandy City",
       "Katugastota",
@@ -45,7 +45,7 @@
     ]
   },
   {
-    "name": "Territorry 04",
+    "name": "Territory 04",
     "areas": [
       "Teldeniya",
       "Madawala",
@@ -60,7 +60,7 @@
     ]
   },
   {
-    "name": "Territorry 05",
+    "name": "Territory 05",
     "areas": [
       "Mawanella",
       "Kadugannawa",

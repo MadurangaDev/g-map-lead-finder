@@ -1,6 +1,6 @@
 {
   "collectors": {
-    "osm": false,
+    "osm": true,
     "googleMaps": true
   }
 }

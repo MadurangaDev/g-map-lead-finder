@@ -160,14 +160,14 @@ export async function collectGoogleMaps(zone: Zone, category: string): Promise<L
 
     const skipped = urls.length - leads.length;
     if (skipped > 0 || Object.keys(failureCounts).length > 0) {
-      logger.info(`Businesses queued: ${urls.length}`);
+      logger.info("Extraction Summary");
       logger.info(`Extracted: ${leads.length}`);
       logger.info(`Skipped: ${skipped}`);
       for (const [reason, cnt] of Object.entries(failureCounts)) {
         logger.info(`- ${reason}: ${cnt}`);
       }
     } else {
-      logger.info(`Businesses queued: ${urls.length}`);
+      logger.info("Extraction Summary");
       logger.info(`Extracted: ${leads.length}`);
       logger.info(`Skipped: ${skipped}`);
     }
